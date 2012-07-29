@@ -1,5 +1,6 @@
 var util = require('util');
 var fs = require('fs');
+var path = require('path');
 var forever = require('forever');
 
 var slog = require ('./logger').slog;
@@ -19,7 +20,7 @@ try {
 // make sure script exists
 forever_config.script = mp(forever_config.script);
 if(!fs.existsSync(forever_config.script)){
-  console.error(util.format("Could find script file to run: '%s'", forever_config.script));
+  console.error(util.format("Couldn't find script file to run: '%s'", forever_config.script));
   process.exit(1);
 }
 
@@ -27,7 +28,18 @@ if(!fs.existsSync(forever_config.script)){
 
 function mp(relpath){
   // make abs path
-  return __dirname + '/' + relpath;
+  //return __dirname + '/' + relpath;
+
+  console.log("CWD:", process.cwd());
+
+  var parent;
+  if(forever_config && forever_config.script){
+    parent = path.resolve(path.dirname(forever_config.script));
+  } else {
+    parent = path.resolve(path.dirname(getCalleeFile()));
+  }
+  console.log("parent:", parent);
+  return path.join( parent, relpath );
 }
 
 slog("foreverize before start_forever");
@@ -89,20 +101,32 @@ start_forever.isMaster = process.env.SPAWNED_BY_FOREVER !== "true";
 
 
 function getCalleeFile(){
-  require("callsite");
-  var filename, me, stack = __stack;
-
-  for(var i = 0; i < stack.length; i++){
-    filename = stack[i].getFileName();
-    if( filename != 'module.js' ){
-      if( me && me != filename ){
-        return filename;
-      } else {
-        me = filename;
-      }
+  var callee_file;
+  return function(){
+    if(callee_file){
+      console.log("returning memoized:", callee_file);
+      return callee_file;
     }
-  };
-  return filename;
+
+    require("callsite");
+    var filename, me, stack = __stack;
+
+    console.log(stack.map(function(s){return s.getFileName();}).join("\n"));
+
+    for(var i = 0; i < stack.length; i++){
+      filename = stack[i].getFileName();
+      if( filename != 'module.js' ){
+        if( me && me != filename ){
+          callee_file = filename;
+          console.log("callee filename: ", filename);
+          return filename;
+        } else {
+          me = filename;
+        }
+      }
+    };
+    return null;
+  }();
 }
 
 

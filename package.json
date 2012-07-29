@@ -6,7 +6,8 @@
   "dependencies": {
     "forever": "0.10.0",
     "callsite": "0.0.2"
-  }
+  },
+  "main": "foreverize.js",
   "devDependencies": {},
   "repository": {
     "type": "git",
