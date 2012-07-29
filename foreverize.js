@@ -9,35 +9,21 @@ var slog = require ('./logger').slog;
 var config_file = 'config/forever.json';
 var forever_config;
 
-try {
-  config_file = mp(config_file);
-  forever_config = require(config_file);
-} catch(e){
-  console.error(util.format("Could not load config file '%s': %s", config_file, e));
-  process.exit(1);
-}
-
-// make sure script exists
-forever_config.script = mp(forever_config.script);
-if(!fs.existsSync(forever_config.script)){
-  console.error(util.format("Couldn't find script file to run: '%s'", forever_config.script));
-  process.exit(1);
+function load_config(){
+  try {
+    config_file = mp(config_file);
+    forever_config = require(config_file);
+  } catch(e){
+    console.error(util.format("Could not load config file '%s': %s", config_file, e));
+    process.exit(1);
+  }
 }
 
 // boiler-plate stuff
 
 function mp(relpath){
   // make abs path
-  //return __dirname + '/' + relpath;
-
-  console.log("CWD:", process.cwd());
-
-  var parent;
-  if(forever_config && forever_config.script){
-    parent = path.resolve(path.dirname(forever_config.script));
-  } else {
-    parent = path.resolve(path.dirname(getCalleeFile()));
-  }
+  var parent = process.cwd();
   console.log("parent:", parent);
   return path.join( parent, relpath );
 }
@@ -51,12 +37,19 @@ var start_forever = function(start_func){
     return;
   }
 
-  forever_config.script = getCalleeFile();
+  slog("I'm a forever MASTER");
 
-  slog("I'm a forever MASTER, starting Monitor:", forever_config.script);
+  var script_file = getCalleeFile();
+
+  slog("starting Monitor:", script_file);
+
+  // change directory to the child script location
+  process.chdir(path.dirname(script_file));
+
+  load_config();
 
   var start = function(){
-    var child = new (forever.Monitor)(forever_config.script, {
+    var child = new (forever.Monitor)(script_file, {
       env: {
         SPAWNED_BY_FOREVER: "true"
       },
@@ -73,7 +66,7 @@ var start_forever = function(start_func){
     });
 
     child.on('exit', function(){
-      slog("child " + forever_config.script + " exited");
+      slog("child " + script_file + " exited");
     });
 
     child.start();
@@ -111,7 +104,7 @@ function getCalleeFile(){
     require("callsite");
     var filename, me, stack = __stack;
 
-    console.log(stack.map(function(s){return s.getFileName();}).join("\n"));
+    // console.log(stack.map(function(s){return s.getFileName();}).join("\n"));
 
     for(var i = 0; i < stack.length; i++){
       filename = stack[i].getFileName();
