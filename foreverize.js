@@ -24,13 +24,12 @@ function load_config(){
 function mp(relpath){
   // make abs path
   var parent = process.cwd();
-  console.log("parent:", parent);
   return path.join( parent, relpath );
 }
 
-slog("foreverize before start_forever");
-
 var start_forever = function(start_func){
+  slog("foreverize before start_forever");
+
   if(process.env.SPAWNED_BY_FOREVER === "true"){
     slog("I'm a forever subprocess, calling start_func");
     start_func && start_func();
@@ -41,12 +40,18 @@ var start_forever = function(start_func){
 
   var script_file = getCalleeFile();
 
-  slog("starting Monitor:", script_file);
-
   // change directory to the child script location
   process.chdir(path.dirname(script_file));
 
   load_config();
+
+  if(forever_config.script){
+    console.log("switching scrip to:", forever_config.script);
+    script_file = mp(forever_config.script);
+  }
+
+  slog("starting Monitor:", script_file);
+
 
   var start = function(){
     var child = new (forever.Monitor)(script_file, {
@@ -77,7 +82,7 @@ var start_forever = function(start_func){
   forever.list(null, function(err, processes){
     if(err){
       return console.error("Failed to get listing of forever processes:", err);
-    } else if(processes) {
+    } else if(processes && processes.forEach) {
       processes.forEach(function(p){
         if( p.uid === forever_config.uid ){
           throw new Error("A forever process with uid '" + p.uid +
