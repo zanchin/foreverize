@@ -1,7 +1,7 @@
 {
   "author": "Ilya Braude <ilya@cloudmine.me>",
   "name": "foreverize",
-  "version": "0.1.0",
+  "version": "0.0.1",
   "description": "A tool for allowing a process to automatically foreverizing itself",
   "dependencies": {
     "forever": "0.10.0",
@@ -11,7 +11,7 @@
   "devDependencies": {},
   "repository": {
     "type": "git",
-    "url": "git://github.com/cloudmine/foreverize.git"
+    "url": "git://github.com/zanchin/foreverize.git"
   },
   "license": "MIT"
 }
