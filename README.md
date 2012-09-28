@@ -37,14 +37,13 @@ var start_server = function(){
   require("http").createServer().listen(1337);
 }
 
-var foreverize = require("foreverize");
-foreverize();
+var foreverize = require("foreverize")();
 if(!foreverize.isMaster){
   start_server();
 }
 ```
 
-Now if your HTTP server crashes, it'll respawn itself. You can also use the normal 
+Now if your HTTP server crashes, it'll respawn itself. You can also use the normal
 [forever](https://github.com/nodejitsu/forever) commands to manage the process.
 
 ```bash

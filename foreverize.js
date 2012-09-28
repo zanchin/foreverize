@@ -33,7 +33,7 @@ var start_forever = function(start_func){
   if(process.env.SPAWNED_BY_FOREVER === "true"){
     slog("I'm a forever subprocess, calling start_func");
     start_func && start_func();
-    return start_func;
+    return start_forever;
   }
 
   slog("I'm a forever MASTER");
