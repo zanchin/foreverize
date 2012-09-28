@@ -33,7 +33,7 @@ var start_forever = function(start_func){
   if(process.env.SPAWNED_BY_FOREVER === "true"){
     slog("I'm a forever subprocess, calling start_func");
     start_func && start_func();
-    return;
+    return start_func;
   }
 
   slog("I'm a forever MASTER");
@@ -54,6 +54,16 @@ var start_forever = function(start_func){
 
 
   var start = function(){
+    // make sure log directory exits
+    var logdir = mp('log');
+    try {
+      fs.mkdirSync(logdir);
+    } catch(e){
+      if(e.code != "EEXIST"){
+        slog(util.format("WARNING: failed to create log dir '%s': %s", logdir, e));
+      }
+    }
+
     var child = new (forever.Monitor)(script_file, {
       env: {
         SPAWNED_BY_FOREVER: "true"
@@ -64,9 +74,9 @@ var start_forever = function(start_func){
       silent: false,
       command: forever_config.command,
       pidFile: mp('pids/app.pid'),
-      logFile: mp('log/forever.log'), // doesn't do anything in non-deamonized mode
-      outFile: mp('log/out.log'),
-      errFile: mp('log/out.err'),
+      logFile: path.join(logdir, 'forever.log'), // doesn't do anything in non-deamonized mode
+      outFile: path.join(logdir, 'out.log'),
+      errFile: path.join(logdir, 'out.err'),
       options: process.argv.slice(2) // pass on commandline args transparently
     });
 
@@ -77,7 +87,7 @@ var start_forever = function(start_func){
     child.start();
     forever.startServer(child);
   };
-  
+
   // make sure only one cluster process with this uid is running
   forever.list(null, function(err, processes){
     if(err){
@@ -93,6 +103,8 @@ var start_forever = function(start_func){
 
     start();
   });
+
+  return start_forever;
 };
 
 start_forever.isMaster = process.env.SPAWNED_BY_FOREVER !== "true";
