@@ -8,6 +8,7 @@ TODO list:
   1. remove `config/forever.json` dependency (possibly put config into package.json)
   1. remove hard-coded log paths
   1. allow full config options that `forever.Monitor` supports
+  1. remove all the logging to stdout
   1. cleanup code
 
 Wish list:
