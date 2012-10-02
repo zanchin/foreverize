@@ -1,10 +1,10 @@
 {
   "author": "Ilya Braude <ilya@cloudmine.me>",
   "name": "foreverize",
-  "version": "0.0.2",
+  "version": "0.1.0",
   "description": "A tool for allowing a process to automatically foreverizing itself",
   "dependencies": {
-    "forever": "0.10.0",
+    "forever": "0.10.x",
     "callsite": "0.0.2"
   },
   "main": "foreverize.js",
