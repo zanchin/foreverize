@@ -1,91 +1,56 @@
 var util = require('util');
 var fs = require('fs');
 var path = require('path');
+var events = require('events');
 var forever = require('forever');
 
-var slog = require ('./logger').slog;
+var slog = require ('./lib/logger').slog;
 
-// local config
-var config_file = 'config/forever.json';
-var forever_config;
+var foreverize = function(options){
+  // slog("foreverize before start_forever");
 
-function load_config(){
-  try {
-    config_file = mp(config_file);
-    forever_config = require(config_file);
-  } catch(e){
-    console.error(util.format("Could not load config file '%s': %s", config_file, e));
-    process.exit(1);
-  }
-}
-
-// boiler-plate stuff
-
-function mp(relpath){
-  // make abs path
-  var parent = process.cwd();
-  return path.join( parent, relpath );
-}
-
-var start_forever = function(start_func){
-  slog("foreverize before start_forever");
-
-  if(process.env.SPAWNED_BY_FOREVER === "true"){
-    slog("I'm a forever subprocess, calling start_func");
-    start_func && start_func();
-    return start_forever;
+ if(process.env.SPAWNED_BY_FOREVER === "true"){
+    // slog("I'm a forever subprocess");
+    return foreverize;
   }
 
-  slog("I'm a forever MASTER");
+  // slog("I'm a forever MASTER");
 
+  var mp = require('./lib/utils').mp;
+  var config = require('./lib/config');
+
+  // autodetect calling script
   var script_file = getCalleeFile();
 
-  // change directory to the child script location
-  process.chdir(path.dirname(script_file));
-
-  load_config();
+  // local config (gets config file name from argv or default locations)
+  var forever_config = config.load_config(options);
 
   if(forever_config.script){
-    console.log("switching scrip to:", forever_config.script);
+    // console.log("switching script to:", forever_config.script);
     script_file = mp(forever_config.script);
   }
 
-  slog("starting Monitor:", script_file);
+  process.chdir(path.dirname(script_file));
+  // console.log("using script:", script_file);
 
+  // update config with our own overrides
+  forever_config.env = forever_config.env || {};
+  forever_config.env.SPAWNED_BY_FOREVER =  "true";
+  forever_config.options =  process.argv.slice(2); // pass on commandline args transparently
 
+  forever_config = config.apply_defaults(forever_config);
+  // slog("config:", util.inspect(forever_config));
+
+  // slog("starting Monitor:", script_file);
   var start = function(){
-    // make sure log directory exits
-    var logdir = mp('log');
-    try {
-      fs.mkdirSync(logdir);
-    } catch(e){
-      if(e.code != "EEXIST"){
-        slog(util.format("WARNING: failed to create log dir '%s': %s", logdir, e));
-      }
-    }
+    var monitor = new (forever.Monitor)(script_file, forever_config);
 
-    var child = new (forever.Monitor)(script_file, {
-      env: {
-        SPAWNED_BY_FOREVER: "true"
-      },
-      max: 3,
-      uid: forever_config.uid,
-      append: true,
-      silent: false,
-      command: forever_config.command,
-      pidFile: mp('pids/app.pid'),
-      logFile: path.join(logdir, 'forever.log'), // doesn't do anything in non-deamonized mode
-      outFile: path.join(logdir, 'out.log'),
-      errFile: path.join(logdir, 'out.err'),
-      options: process.argv.slice(2) // pass on commandline args transparently
+    monitor.on('exit', function(){
+      console.error("Monitored " + script_file + " exited");
     });
 
-    child.on('exit', function(){
-      slog("child " + script_file + " exited");
-    });
-
-    child.start();
-    forever.startServer(child);
+    monitor.start();
+    forever.startServer(monitor);
   };
 
   // make sure only one cluster process with this uid is running
@@ -104,40 +69,40 @@ var start_forever = function(start_func){
     start();
   });
 
-  return start_forever;
+  return foreverize;
 };
 
-start_forever.isMaster = process.env.SPAWNED_BY_FOREVER !== "true";
-
-
 function getCalleeFile(){
-  var callee_file;
-  return function(){
-    if(callee_file){
-      console.log("returning memoized:", callee_file);
-      return callee_file;
-    }
+  return process.argv[1];
 
-    require("callsite");
-    var filename, me, stack = __stack;
+  // var callee_file;
+  // return function(){
+  //   if(callee_file){
+  //     // console.log("returning memoized:", callee_file);
+  //     return callee_file;
+  //   }
 
-    // console.log(stack.map(function(s){return s.getFileName();}).join("\n"));
+  //   require("callsite");
+  //   var filename, me, stack = __stack;
 
-    for(var i = 0; i < stack.length; i++){
-      filename = stack[i].getFileName();
-      if( filename != 'module.js' ){
-        if( me && me != filename ){
-          callee_file = filename;
-          console.log("callee filename: ", filename);
-          return filename;
-        } else {
-          me = filename;
-        }
-      }
-    };
-    return null;
-  }();
+  //   // console.log(stack.map(function(s){return s.getFileName();}).join("\n"));
+
+  //   for(var i = 0; i < stack.length; i++){
+  //     filename = stack[i].getFileName();
+  //     if( filename != 'module.js' ){
+  //       if( me && me != filename ){
+  //         callee_file = filename;
+  //         // console.log("callee filename: ", filename);
+  //         return filename;
+  //       } else {
+  //         me = filename;
+  //       }
+  //     }
+  //   };
+  //   return null;
+  // }();
 }
 
+foreverize.isMaster = foreverize.isMonitor = process.env.SPAWNED_BY_FOREVER !== "true";
 
-module.exports = start_forever;
+module.exports = foreverize;
